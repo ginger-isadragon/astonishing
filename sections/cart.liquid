@@ -5,33 +5,666 @@
   https://shopify.dev/docs/storefronts/themes/architecture/templates/cart
 {% endcomment %}
 
-<h1>{{ 'cart.title' | t }}</h1>
+<div class="cart-page">
+  <h1 class="cart-title">{{ 'cart.title' | t }}</h1>
 
-<form action="{{ routes.cart_url }}" method="post">
-  <table>
-    {% for item in cart.items %}
-      <tr>
-        <td>
-          {% render 'image', image: item.image, url: item.url %}
-        </td>
-        <td>
-          <p>{{ item.product.title }}</p>
-          {{ 'cart.remove' | t | link_to: item.url_to_remove }}
-        </td>
-        <td>
-          <input type="text" name="updates[]" value="{{ item.quantity }}">
-          <input type="submit" value="{{ 'cart.update' | t }}">
-        </td>
-      </tr>
-    {% endfor %}
-  </table>
+  {% if cart.item_count == 0 %}
+    <div class="cart-empty">
+      <p>{{ 'cart.empty' | t }}</p>
+      <a href="{{ routes.all_products_collection_url }}" class="button">{{ 'cart.continue_shopping' | t }}</a>
+    </div>
+  {% else %}
+    <form action="{{ routes.cart_url }}" method="post" id="cart-form" class="cart-form">
+      <div class="cart-items">
+        {% for item in cart.items %}
+          <div class="cart-item" data-line-item-key="{{ item.key }}">
+            <div class="cart-item__image">
+              <a href="{{ item.url }}">
+                {% if item.image %}
+                  {% render 'image', class: 'cart-item-image', image: item.image %}
+                {% endif %}
+              </a>
+            </div>
 
-  <input type="submit" name="checkout" value="{{ 'cart.checkout' | t }}">
-</form>
+            <div class="cart-item__details">
+              <a href="{{ item.url }}" class="cart-item__title">
+                {{ item.product.title }}
+              </a>
+
+              {% unless item.product.has_only_default_variant %}
+                <div class="cart-item__variant">
+                  {{ item.variant.title }}
+                </div>
+              {% endunless %}
+
+              {% comment %} Display selling plan if subscription {% endcomment %}
+              {% if item.selling_plan_allocation %}
+                <div class="cart-item__selling-plan">
+                  <span class="selling-plan-badge">Subscription</span>
+                  <p class="selling-plan-name">{{ item.selling_plan_allocation.selling_plan.name }}</p>
+                </div>
+              {% endif %}
+
+              {% comment %} Display properties/customizations {% endcomment %}
+              {% if item.properties != blank %}
+                <div class="cart-item__properties">
+                  {% for property in item.properties %}
+                    {% unless property.last == blank %}
+                      <p>
+                        <strong>{{ property.first }}:</strong>
+                        {% if property.last contains '/uploads/' %}
+                          <a href="{{ property.last }}">{{ property.last | split: '/' | last }}</a>
+                        {% else %}
+                          {{ property.last }}
+                        {% endif %}
+                      </p>
+                    {% endunless %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              {% comment %} Unit price {% endcomment %}
+              <div class="cart-item__price-per-item">
+                {% if item.original_price != item.final_price %}
+                  <span class="cart-item__price cart-item__price--sale">{{ item.final_price | money }}</span>
+                  <span class="cart-item__price cart-item__price--compare">{{ item.original_price | money }}</span>
+                {% else %}
+                  <span class="cart-item__price">{{ item.original_price | money }}</span>
+                {% endif %}
+
+                {% if item.unit_price %}
+                  <div class="unit-price">
+                    <span class="unit-price__price">{{ item.unit_price | money }}</span>
+                    <span class="unit-price__separator">/</span>
+                    <span class="unit-price__unit">
+                      {%- if item.unit_price_measurement.reference_value != 1 -%}
+                        {{ item.unit_price_measurement.reference_value }}
+                      {%- endif -%}
+                      {{ item.unit_price_measurement.reference_unit }}
+                    </span>
+                  </div>
+                {% endif %}
+              </div>
+
+              {% comment %} Display discounts applied to line item {% endcomment %}
+              {% if item.line_level_discount_allocations.size > 0 %}
+                <div class="cart-item__discounts">
+                  {% for discount in item.line_level_discount_allocations %}
+                    <div class="cart-discount">
+                      <span class="cart-discount__icon">🎉</span>
+                      <span class="cart-discount__label">{{ discount.discount_application.title }}</span>
+                      <span class="cart-discount__amount">-{{ discount.amount | money }}</span>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="cart-item__quantity">
+              <label for="updates_{{ item.key }}" class="visually-hidden">Quantity</label>
+              <div class="quantity-selector">
+                <button
+                  type="button"
+                  class="quantity-button quantity-button--minus"
+                  data-action="decrease"
+                  data-line="{{ forloop.index }}"
+                  aria-label="Decrease quantity"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  id="updates_{{ item.key }}"
+                  name="updates[]"
+                  value="{{ item.quantity }}"
+                  min="0"
+                  class="quantity-input"
+                  data-line="{{ forloop.index }}"
+                  aria-label="Quantity for {{ item.product.title }}"
+                >
+                <button
+                  type="button"
+                  class="quantity-button quantity-button--plus"
+                  data-action="increase"
+                  data-line="{{ forloop.index }}"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+              <a href="{{ item.url_to_remove }}" class="cart-item__remove">Remove</a>
+            </div>
+
+            <div class="cart-item__total">
+              <span class="cart-item__final-price">{{ item.final_line_price | money }}</span>
+              {% if item.original_line_price != item.final_line_price %}
+                <span class="cart-item__original-price">{{ item.original_line_price | money }}</span>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="cart-footer">
+        <div class="cart-note">
+          <label for="cart-note">{{ 'cart.note' | t }}</label>
+          <textarea id="cart-note" name="note" class="cart-note__input">{{ cart.note }}</textarea>
+        </div>
+
+        <div class="cart-summary">
+          <h2 class="cart-summary__title">Order Summary</h2>
+
+          <div class="cart-summary__line">
+            <span>Subtotal</span>
+            <span class="cart-summary__price">{{ cart.original_total_price | money }}</span>
+          </div>
+
+          {% comment %} Display cart-level discounts {% endcomment %}
+          {% if cart.cart_level_discount_applications.size > 0 %}
+            <div class="cart-discounts">
+              {% for discount in cart.cart_level_discount_applications %}
+                <div class="cart-summary__line cart-summary__line--discount">
+                  <span>
+                    <span class="cart-discount__icon">🎉</span>
+                    {{ discount.title }}
+                  </span>
+                  <span class="cart-discount__amount">-{{ discount.total_allocated_amount | money }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% if cart.original_total_price != cart.total_price %}
+            <div class="cart-summary__line cart-summary__line--total-discount">
+              <span>Total Savings</span>
+              <span class="cart-savings__amount">-{{ cart.total_discount | money }}</span>
+            </div>
+          {% endif %}
+
+          <div class="cart-summary__line cart-summary__line--total">
+            <span>Total</span>
+            <span class="cart-summary__price--total">{{ cart.total_price | money }}</span>
+          </div>
+
+          <p class="cart-summary__note">Taxes and shipping calculated at checkout</p>
+
+          {% comment %} Discount code input {% endcomment %}
+          {% if section.settings.show_discount_code %}
+            <div class="cart-discount-code">
+              <label for="discount-code">Discount Code</label>
+              <div class="discount-code-input">
+                <input
+                  type="text"
+                  id="discount-code"
+                  name="discount"
+                  placeholder="Enter code"
+                  class="discount-code__field"
+                >
+                <button type="button" class="discount-code__button" id="apply-discount">
+                  Apply
+                </button>
+              </div>
+            </div>
+          {% endif %}
+
+          <button type="submit" name="checkout" class="cart-checkout-button">
+            {{ 'cart.checkout' | t }}
+          </button>
+
+          {% comment %} Accelerated checkout buttons {% endcomment %}
+          <div class="cart-dynamic-checkout">
+            {{ content_for_additional_checkout_buttons }}
+          </div>
+
+          <a href="{{ routes.all_products_collection_url }}" class="cart-continue-shopping">
+            {{ 'cart.continue_shopping' | t }}
+          </a>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+</div>
+
+{% stylesheet %}
+  .cart-page {
+    max-width: var(--page-width);
+    margin: 0 auto;
+    padding: var(--page-margin);
+  }
+
+  .cart-title {
+    margin-bottom: 2rem;
+  }
+
+  .cart-empty {
+    text-align: center;
+    padding: 3rem 0;
+  }
+
+  .cart-form {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+  }
+
+  .cart-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .cart-item {
+    display: grid;
+    grid-template-columns: 100px 1fr auto auto;
+    gap: 1rem;
+    padding: 1.5rem;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+  }
+
+  .cart-item__image {
+    width: 100px;
+  }
+
+  .cart-item__image img {
+    width: 100%;
+    height: auto;
+  }
+
+  .cart-item__title {
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--color-foreground);
+  }
+
+  .cart-item__variant {
+    font-size: 0.875rem;
+    color: #666;
+    margin-top: 0.25rem;
+  }
+
+  .cart-item__selling-plan {
+    margin-top: 0.5rem;
+  }
+
+  .selling-plan-badge {
+    background: #4CAF50;
+    color: white;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+  }
+
+  .selling-plan-name {
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+  }
+
+  .cart-item__price-per-item {
+    margin-top: 0.5rem;
+  }
+
+  .cart-item__price {
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  .cart-item__price--sale {
+    color: #c00;
+  }
+
+  .cart-item__price--compare {
+    text-decoration: line-through;
+    color: #999;
+    margin-left: 0.5rem;
+  }
+
+  .unit-price {
+    font-size: 0.75rem;
+    color: #666;
+    margin-top: 0.25rem;
+  }
+
+  .cart-item__discounts {
+    margin-top: 0.5rem;
+  }
+
+  .cart-discount {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    color: #4CAF50;
+  }
+
+  .cart-discount__amount {
+    font-weight: 600;
+  }
+
+  .quantity-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: var(--style-border-radius-inputs);
+    width: fit-content;
+  }
+
+  .quantity-button {
+    background: none;
+    border: none;
+    padding: 0.5rem;
+    cursor: pointer;
+    font-size: 1.2rem;
+    width: 32px;
+    height: 32px;
+  }
+
+  .quantity-input {
+    width: 50px;
+    text-align: center;
+    border: none;
+    font-size: 1rem;
+  }
+
+  .cart-item__remove {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    color: #c00;
+    text-decoration: none;
+  }
+
+  .cart-item__total {
+    text-align: right;
+  }
+
+  .cart-item__final-price {
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .cart-item__original-price {
+    display: block;
+    text-decoration: line-through;
+    color: #999;
+    font-size: 1rem;
+    margin-top: 0.25rem;
+  }
+
+  .cart-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .cart-note {
+    padding: 1rem;
+    background: #f5f5f5;
+    border-radius: 4px;
+  }
+
+  .cart-note label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  .cart-note__input {
+    width: 100%;
+    min-height: 80px;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: var(--style-border-radius-inputs);
+  }
+
+  .cart-summary {
+    position: sticky;
+    top: 2rem;
+    padding: 1.5rem;
+    background: #f9f9f9;
+    border-radius: 4px;
+  }
+
+  .cart-summary__title {
+    margin-bottom: 1rem;
+  }
+
+  .cart-summary__line {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+  }
+
+  .cart-summary__line--discount {
+    color: #4CAF50;
+  }
+
+  .cart-summary__line--total {
+    font-size: 1.25rem;
+    font-weight: 700;
+    padding-top: 1rem;
+    border-top: 2px solid #ccc;
+    margin-top: 1rem;
+  }
+
+  .cart-summary__note {
+    font-size: 0.875rem;
+    color: #666;
+    margin: 1rem 0;
+  }
+
+  .cart-discount-code {
+    margin: 1rem 0;
+  }
+
+  .cart-discount-code label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  .discount-code-input {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .discount-code__field {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: var(--style-border-radius-inputs);
+  }
+
+  .discount-code__button {
+    padding: 0.5rem 1rem;
+    background: var(--color-foreground);
+    color: var(--color-background);
+    border: none;
+    cursor: pointer;
+    border-radius: var(--style-border-radius-inputs);
+  }
+
+  .cart-checkout-button {
+    width: 100%;
+    padding: 1rem;
+    background: var(--color-foreground);
+    color: var(--color-background);
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 1rem 0;
+    border-radius: var(--style-border-radius-inputs);
+  }
+
+  .cart-dynamic-checkout {
+    margin: 1rem 0;
+  }
+
+  .cart-continue-shopping {
+    display: block;
+    text-align: center;
+    margin-top: 1rem;
+    color: var(--color-foreground);
+    text-decoration: none;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  @media (max-width: 768px) {
+    .cart-form {
+      grid-template-columns: 1fr;
+    }
+
+    .cart-item {
+      grid-template-columns: 80px 1fr;
+      grid-template-rows: auto auto auto;
+    }
+
+    .cart-item__quantity {
+      grid-column: 1 / -1;
+    }
+
+    .cart-item__total {
+      grid-column: 1 / -1;
+      text-align: left;
+    }
+
+    .cart-summary {
+      position: static;
+    }
+  }
+{% endstylesheet %}
+
+{% javascript %}
+  class CartPage {
+    constructor() {
+      this.form = document.getElementById('cart-form');
+      if (!this.form) return;
+
+      this.init();
+    }
+
+    init() {
+      this.setupQuantityButtons();
+      this.setupDiscountCode();
+      this.setupAutoUpdate();
+    }
+
+    setupQuantityButtons() {
+      const buttons = document.querySelectorAll('.quantity-button');
+      buttons.forEach(button => {
+        button.addEventListener('click', (e) => {
+          e.preventDefault();
+          const action = button.dataset.action;
+          const input = button.parentElement.querySelector('.quantity-input');
+          let quantity = parseInt(input.value);
+
+          if (action === 'increase') {
+            quantity++;
+          } else if (action === 'decrease' && quantity > 0) {
+            quantity--;
+          }
+
+          input.value = quantity;
+          this.updateCart();
+        });
+      });
+    }
+
+    setupDiscountCode() {
+      const applyButton = document.getElementById('apply-discount');
+      if (!applyButton) return;
+
+      applyButton.addEventListener('click', () => {
+        const discountInput = document.getElementById('discount-code');
+        const code = discountInput.value.trim();
+
+        if (code) {
+          // Redirect to checkout with discount code
+          window.location.href = `/checkout?discount=${encodeURIComponent(code)}`;
+        }
+      });
+
+      // Allow Enter key to apply discount
+      const discountInput = document.getElementById('discount-code');
+      if (discountInput) {
+        discountInput.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            applyButton.click();
+          }
+        });
+      }
+    }
+
+    setupAutoUpdate() {
+      const quantityInputs = document.querySelectorAll('.quantity-input');
+      quantityInputs.forEach(input => {
+        input.addEventListener('change', () => {
+          this.updateCart();
+        });
+      });
+    }
+
+    async updateCart() {
+      const formData = new FormData(this.form);
+      const updates = {};
+
+      // Build updates object
+      const inputs = this.form.querySelectorAll('.quantity-input');
+      inputs.forEach((input, index) => {
+        updates[index + 1] = parseInt(input.value);
+      });
+
+      try {
+        const response = await fetch('/cart/update.js', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ updates })
+        });
+
+        if (response.ok) {
+          // Reload page to show updated cart
+          window.location.reload();
+        }
+      } catch (error) {
+        console.error('Error updating cart:', error);
+      }
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => new CartPage());
+  } else {
+    new CartPage();
+  }
+{% endjavascript %}
 
 {% schema %}
 {
   "name": "t:general.cart",
-  "settings": []
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_discount_code",
+      "label": "Show discount code field",
+      "default": true
+    }
+  ]
 }
 {% endschema %}
