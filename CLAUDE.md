@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Shopify Skeleton Theme - a minimal, carefully structured Shopify theme designed as a foundational starting point. It follows Shopify's best practices and emphasizes modularity and maintainability. The theme is intentionally minimalist and should not become a fully-featured theme.
+This is Vintner - a professional Shopify theme designed specifically for wine and spirits retailers. Built on the Shopify Skeleton Theme foundation, it now includes all mandatory Shopify Theme Store features, wine-specific functionality including age verification, and follows Shopify's best practices for modularity and maintainability.
 
 ## Development Commands
 

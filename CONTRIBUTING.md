@@ -1,4 +1,4 @@
-# Contributing to Skeleton Theme
+# Contributing to Vintner Theme
 
 ## How to contribute
 

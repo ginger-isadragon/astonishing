@@ -1,11 +1,11 @@
 [
   {
     "name": "theme_info",
-    "theme_name": "Skeleton",
-    "theme_version": "0.1.0",
-    "theme_author": "Shopify",
-    "theme_documentation_url": "https://help.shopify.com/manual/online-store/themes",
-    "theme_support_url": "https://support.shopify.com/"
+    "theme_name": "Vintner",
+    "theme_version": "1.0.0",
+    "theme_author": "Your Name",
+    "theme_documentation_url": "https://yourwebsite.com/vintner-documentation",
+    "theme_support_url": "https://yourwebsite.com/support"
   },
   {
     "name": "t:general.typography",
